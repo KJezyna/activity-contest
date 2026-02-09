@@ -94,14 +94,14 @@ export default function Home(){
                             </div>
                             {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
                             <a href="/">
-                                <Button className="w-fit border hover:bg-gray-200">Back to Main</Button>
+                                <Button className="w-fit border hover:bg-gray-700">Back to Main</Button>
                             </a>
                             {stats ?
-                                (<Button className="w-fit border hover:bg-gray-200" onClick={() => setStats(false)}>
+                                (<Button className="w-fit border hover:bg-gray-700" onClick={() => setStats(false)}>
                                     {!session? ("Sign up / Log in") : ("Profile")}
                                 </Button>)
                                 :
-                                (<Button className="w-fit border hover:bg-gray-200" onClick={() => window.location.reload()}>Team activity</Button>)
+                                (<Button className="w-fit border hover:bg-gray-700" onClick={() => window.location.reload()}>Team activity</Button>)
                             }
                         </div>
                     </CardHeader>
@@ -132,7 +132,7 @@ export default function Home(){
                                         </div>
                                     </CardContent>
                                     <CardFooter>
-                                        <Button className="w-full border hover:bg-gray-200"
+                                        <Button className="w-full border hover:bg-gray-700"
                                                 onClick={() => handleRegister(usernameSignUp, passwordSignUp)}>Sign up
                                         </Button>
                                     </CardFooter>
@@ -186,7 +186,7 @@ export default function Home(){
                                                             <option value="2">blue team</option>
                                                             <option value="3">red team</option>
                                                         </select>
-                                                        <Button className="border hover:bg-gray-200"
+                                                        <Button className="border hover:bg-gray-700"
                                                                 onClick={() => updateTeam(Number(teamValue))}>Set Team
                                                         </Button>
                                                     </div>
@@ -220,14 +220,14 @@ export default function Home(){
                                                             />
                                                                 <Button
                                                                     size="icon"
-                                                                    className="border hover:bg-gray-200"
+                                                                    className="border hover:bg-gray-700"
                                                                     onClick={() => SubtractDistance(parseFloat(inputValues[Number(row.id)] || "0"), multiplier)}
                                                                 >
                                                                     -
                                                                 </Button>
                                                                 <Button
                                                                     size="icon"
-                                                                    className="border hover:bg-gray-200"
+                                                                    className="border hover:bg-gray-700"
                                                                     onClick={() => UpdateDistance(parseFloat(inputValues[Number(row.id)] || "0"), multiplier)}
                                                                 >
                                                                     +
@@ -285,7 +285,7 @@ export default function Home(){
                                                                             }
                                                                         }}
                                                                     >
-                                                                        <Trash2 className="h-4 w-4" />
+                                                                        <Trash2 className="h-4 w-4 text-white"/>
                                                                     </Button>
                                                                 </div>
                                                             ))}
@@ -308,7 +308,7 @@ export default function Home(){
                                         <div className="flex justify-between items-center">
                                             <p className="text-sm text-muted-foreground">Logged in as <b>{session?.user.email?.split('@')[0]}</b></p>
                                             <Button variant="destructive"
-                                                    className="border hover:bg-gray-200"
+                                                    className="border hover:bg-red-500 text-white"
                                                     onClick={handleLogout}>Logout
                                             </Button>
                                         </div>

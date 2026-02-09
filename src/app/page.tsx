@@ -88,8 +88,8 @@ export default function Home() {
                 }
             }
 
-            if(error1) console.error("Błąd Team1:", error1.message, error1.hint);
-            if(error2) console.error("Błąd Team2:", error2.message, error2.hint);
+            if(error1) console.error("Error Team1:", error1.message, error1.hint);
+            if(error2) console.error("Error Team2:", error2.message, error2.hint);
         };
         void getData();
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -130,11 +130,11 @@ export default function Home() {
                             </div>
                             <div className="flex gap-2">
                                 {stats ?
-                                    (<Button className="w-fit border hover:bg-gray-200" onClick={() => setStats(false)}>
+                                    (<Button className="w-fit border hover:bg-gray-700" onClick={() => setStats(false)}>
                                         {!session? ("Sign up / Log in") : ("Profile")}
                                     </Button>)
                                     :
-                                    (<Button className="w-fit border hover:bg-gray-200" onClick={() => window.location.reload()}>Team activity</Button>)
+                                    (<Button className="w-fit border hover:bg-gray-700" onClick={() => window.location.reload()}>Team activity</Button>)
                                 }
                             </div>
                         </div>
@@ -193,7 +193,7 @@ export default function Home() {
                                             </div>
                                         </CardContent>
                                         <CardFooter>
-                                            <Button className="w-full border hover:bg-gray-200"
+                                            <Button className="w-full border hover:bg-gray-700"
                                                     onClick={() => handleLogin(usernameLogIn, passwordLogIn)}>Log in
                                             </Button>
                                         </CardFooter>
@@ -220,7 +220,7 @@ export default function Home() {
                                                                     <option value="2">blue team</option>
                                                                     <option value="3">red team</option>
                                                                 </select>
-                                                                <Button className="border hover:bg-gray-200"
+                                                                <Button className="border hover:bg-gray-700"
                                                                         onClick={() => updateTeam(Number(teamValue))}>Set Team
                                                                 </Button>
                                                             </div>
@@ -254,14 +254,14 @@ export default function Home() {
                                                                         />
                                                                         <Button
                                                                             size="icon"
-                                                                            className="border hover:bg-gray-200"
+                                                                            className="border hover:bg-gray-700"
                                                                             onClick={() => SubtractDistance(parseFloat(inputValues[Number(row.id)] || "0"), multiplier)}
                                                                         >
                                                                             -
                                                                         </Button>
                                                                         <Button
                                                                             size="icon"
-                                                                            className="border hover:bg-gray-200"
+                                                                            className="border hover:bg-gray-700"
                                                                             onClick={() => UpdateDistance(parseFloat(inputValues[Number(row.id)] || "0"), multiplier)}
                                                                         >
                                                                             +
@@ -319,7 +319,7 @@ export default function Home() {
                                                                                     }
                                                                                 }}
                                                                             >
-                                                                                <Trash2 className="h-4 w-4" />
+                                                                                <Trash2 className="h-4 w-4 text-white"/>
                                                                             </Button>
                                                                         </div>
                                                                     ))}
@@ -342,7 +342,7 @@ export default function Home() {
                                     <div className="flex justify-between items-center">
                                         <p className="text-sm text-muted-foreground">Logged in as <b>{session?.user.email?.split('@')[0]}</b></p>
                                         <Button variant="destructive"
-                                                className="border hover:bg-gray-200"
+                                                className="border hover:bg-red-500 text-white"
                                                 onClick={handleLogout}>Logout
                                         </Button>
                                     </div>

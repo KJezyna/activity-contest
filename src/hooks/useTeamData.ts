@@ -175,8 +175,8 @@ export function useTeamData(teamId: number, personId: string | undefined, isRequ
                 return;
             }
         } catch (error) {
-            console.error("Błąd przesyłania:", error);
-            alert("Wystąpił błąd podczas wgrywania screena.");
+            console.error("Error:", error);
+            alert("Screen error.");
             return;
         } finally {
             setUseUploading(undefined);
@@ -252,7 +252,7 @@ export function useTeamData(teamId: number, personId: string | undefined, isRequ
         const { error } = await supabase.auth.signOut();
 
         if (error) {
-            console.error("Błąd podczas wylogowywania:", error.message);
+            console.error("Logout error:", error.message);
         }
     };
 

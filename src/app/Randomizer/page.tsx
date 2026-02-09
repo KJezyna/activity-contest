@@ -130,7 +130,7 @@ export default function Home(){
                     </div>
                     {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
                     <a href="/">
-                        <Button className="border hover:bg-gray-200">Back to Main</Button>
+                        <Button className="border hover:bg-gray-700">Back to Main</Button>
                     </a>
                 </CardHeader>
 
@@ -187,7 +187,7 @@ export default function Home(){
                     <div className="grid gap-4">
                         <Button
                             onClick={handleRandomize}
-                            className="border hover:bg-gray-200"
+                            className="border hover:bg-gray-700"
                             disabled={selectedIds.length < 2}
                             size="lg"
                         >
