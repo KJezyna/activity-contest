@@ -3,8 +3,11 @@ import {Button} from "@/components/ui/button";
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
 import React, {useEffect, useState} from "react";
 import {supabase} from "@/lib/supabase";
+import {TEAMS} from "@/lib/teamConfig";
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
 import { UserIcon } from "lucide-react";
+import {toast} from "sonner";
+import {Spinner} from "@/components/ui/spinner";
 
 interface IPeople {
     id: string;
@@ -14,9 +17,9 @@ interface IPeople {
 export default function Home(){
 
     const [PeopleArray, setPeopleArray] = useState<IPeople[]>([]);
-
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [teams, setTeams] = useState<{ blue: IPeople[], red: IPeople[] } | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     const handleCheckboxChange = (id: string) => {
         setSelectedIds(prev =>
@@ -28,11 +31,15 @@ export default function Home(){
         const selectedPeople = PeopleArray.filter(p => selectedIds.includes(p.id));
 
         if (selectedPeople.length < 2) {
-            alert("Select at least 2 people!");
+            toast.error("Select at least 2 people!");
             return;
         }
 
-        const shuffled = [...selectedPeople].sort(() => Math.random() - 0.5);
+        const shuffled = [...selectedPeople];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
 
         const mid = Math.ceil(shuffled.length / 2);
         setTeams({
@@ -43,6 +50,7 @@ export default function Home(){
 
     const saveTeamsToDatabase = async () => {
         if (!teams) return;
+        setIsSaving(true);
 
         const blueIds = teams.blue.map((p) => p.id);
         const redIds = teams.red.map((p) => p.id);
@@ -55,34 +63,39 @@ export default function Home(){
 
             if (teamError) {
                 console.error(teamError);
+                toast.error("Failed to reset teams.");
                 return;
             }
 
             const { error: blueError } = await supabase
                 .from("Distance")
-                .update({ team: 2 })
+                .update({ team: TEAMS.team1.teamId })
                 .in("person", blueIds);
 
             if (blueError) {
                 console.error(blueError);
+                toast.error("Failed to assign Blue Team.");
                 return;
             }
 
             const { error: redError } = await supabase
                 .from("Distance")
-                .update({ team: 3 })
+                .update({ team: TEAMS.team2.teamId })
                 .in("person", redIds);
 
             if (redError) {
                 console.error(redError);
+                toast.error("Failed to assign Red Team.");
                 return;
             }
 
-            alert("Teams saved successfully!");
+            toast.success("Teams saved successfully!");
             window.location.href = "/";
         } catch (err) {
             console.error("Error saving teams:", err);
-            alert("Failed to save teams.");
+            toast.error("Failed to save teams.");
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -125,7 +138,7 @@ export default function Home(){
                     <div className="mb-4 sm:mb-0">
                         <CardTitle>Team Randomizer</CardTitle>
                         <CardDescription>
-                            Enter names separated by semicolons to randomize into two teams.
+                            Select participants from the list below to randomize into two teams.
                         </CardDescription>
                     </div>
                     {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
@@ -133,8 +146,6 @@ export default function Home(){
                         <Button className="border hover:bg-gray-700">Back to Main</Button>
                     </a>
                 </CardHeader>
-
-
 
                 <CardContent className="grid gap-6">
                     <Card>
@@ -218,7 +229,15 @@ export default function Home(){
                                         </CardContent>
                                     </Card>
                                 </div>
-                                <Button onClick={saveTeamsToDatabase} className="border hover:bg-gray-200" size="lg" variant="secondary">Save Teams to Database</Button>
+                                <Button
+                                    onClick={saveTeamsToDatabase}
+                                    className="border hover:bg-gray-200"
+                                    size="lg"
+                                    variant="secondary"
+                                    disabled={isSaving}
+                                >
+                                    {isSaving ? <><Spinner className="mr-2 h-4 w-4 animate-spin" />Saving...</> : "Save Teams to Database"}
+                                </Button>
                             </div>
                         )}
                     </div>
