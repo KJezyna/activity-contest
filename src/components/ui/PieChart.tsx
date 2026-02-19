@@ -15,8 +15,8 @@ interface IChartPieSimpleProps {
 export function ChartPieSimple({team1percent, team2percent, team1value, team2value}: IChartPieSimpleProps) {
 
     const data = [
-        { name: 'Team 1', value: team1percent, distance: team1value, fill: '#3b82f6' },
-        { name: 'Team 2', value: team2percent, distance: team2value, fill: '#ef4444' },
+        { name: 'Blue Team', value: team1percent, distance: team1value, fill: '#3b82f6' },
+        { name: 'Red Team', value: team2percent, distance: team2value, fill: '#ef4444' },
     ];
 
     const COLORS = ['#3b82f6', '#ef4444'];
