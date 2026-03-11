@@ -1,386 +1,217 @@
-"use client"
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from "@/components/ui/card";
-import {supabase} from "@/lib/supabase";
-import React, {useEffect, useRef, useState} from "react";
-import {ChartPieSimple} from "@/components/ui/PieChart";
-import {useSessionAndStats} from "@/hooks/sessionAndStats";
-import {useTeamData} from "@/hooks/useTeamData";
-import {Input} from "@/components/ui/input";
-import {ImagePlusIcon, Trash2} from "lucide-react";
-import {Spinner} from "@/components/ui/spinner";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAppStore } from "@/stores/appStore";
+import type { TeamStats, LeaderboardEntry } from "@/lib/types";
+import { TeamBarChart } from "@/components/charts/TeamBarChart";
+import { TeamPieChart } from "@/components/charts/TeamPieChart";
+import { ProgressLineChart } from "@/components/charts/ProgressLineChart";
+import { WeeklyTrendChart } from "@/components/charts/WeeklyTrendChart";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageTransition } from "@/components/layout/PageTransition";
+import { Trophy, Users, TrendingUp, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 
-    const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
+export default function DashboardPage() {
+  const { teams, getConfigValue } = useAppStore();
+  const [teamStats, setTeamStats] = useState<TeamStats[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [allActivities, setAllActivities] = useState<{ created_at: string; points: number }[]>([]);
+  const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
 
-    const {
-        session,
-        setSession,
-        stats,
-        setStats
-    } = useSessionAndStats();
+  useEffect(() => {
+    const load = async () => {
+      const [statsRes, peopleRes, activitiesRes] = await Promise.all([
+        supabase.from("mv_team_stats").select("*"),
+        supabase.from("mv_people_stats").select("*").order("total_points", { ascending: false }).limit(15),
+        supabase.from("activities").select("created_at, points").order("created_at", { ascending: true }),
+      ]);
 
-    const {
-        inputValues,
-        personResult,
-        InputChange,
-        UpdateDistance,
-        SubtractDistance,
-        uploadDistanceProof,
-        useUploading,
-        handleRegister,
-        handleLogin,
-        handleLogout,
-        updatePerson,
-        updateTeam,
-        usernameLogIn,
-        setUsernameLogIn,
-        usernameSignUp,
-        setUsernameSignUp,
-        passwordLogIn,
-        setPasswordLogIn,
-        passwordSignUp,
-        setPasswordSignUp,
-        teamValue,
-        setTeamValue,
-        multiplier,
-        setMultiplier,
-        proof,
-        gallery,
-        deleteProof
-    } = useTeamData(0, session?.user.id, false)
+      if (statsRes.data) setTeamStats(statsRes.data as TeamStats[]);
 
-    const [team1, setTeam1] = useState(0);
-    const [team2, setTeam2] = useState(0);
-    const [team1val, setTeam1val] = useState(0);
-    const [team2val, setTeam2val] = useState(0);
+      if (peopleRes.data) {
+        const inactiveDays = parseInt(getConfigValue("inactive_days_threshold", "7"));
+        const inactivePercentile = parseInt(getConfigValue("inactive_percentile_threshold", "25"));
+        const now = Date.now();
 
-    useEffect(() => {
-        const getData = async () => {
-            const {data: data1, error: error1} = await supabase
-                .from('TeamsDistance')
-                .select('total_distance')
-                .eq('team', 2)
-                .single();
+        const people = peopleRes.data as LeaderboardEntry[];
+        const sorted = [...people].sort((a, b) => b.total_points - a.total_points);
+        const cutoffIndex = Math.floor(sorted.length * (inactivePercentile / 100));
+        const cutoffPoints = sorted[sorted.length - 1 - cutoffIndex]?.total_points ?? 0;
 
-            const {data: data2, error: error2} = await supabase
-                .from('TeamsDistance')
-                .select('total_distance')
-                .eq('team', 3)
-                .single();
-
-            if (data1 && data2) {
-
-                setTeam1val(data1.total_distance);
-                setTeam2val(data2.total_distance);
-
-                const sum = data1.total_distance + data2.total_distance;
-                if (sum > 0) {
-                    const res1 = (data1.total_distance / sum) * 100;
-                    const res2 = (data2.total_distance / sum) * 100;
-
-                    setTeam1(parseFloat(res1.toFixed(2)));
-                    setTeam2(parseFloat(res2.toFixed(2)));
-                } else {
-                    setTeam1(50);
-                    setTeam2(50);
-                }
-            }
-
-            if(error1) console.error("Error Team1:", error1.message, error1.hint);
-            if(error2) console.error("Error Team2:", error2.message, error2.hint);
-        };
-        void getData();
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-
-            if (session) {
-                updatePerson();
-                gallery();
-            }
+        const entries: LeaderboardEntry[] = people.map((p) => {
+          const daysSinceActivity = p.last_activity
+            ? Math.floor((now - new Date(p.last_activity).getTime()) / 86400000)
+            : 999;
+          const isInactive = daysSinceActivity >= inactiveDays || p.total_points <= cutoffPoints;
+          return { ...p, is_inactive: isInactive };
         });
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
+        setLeaderboard(entries);
+      }
 
-            if (session) {
-                updatePerson();
-            }
-        });
+      if (activitiesRes.data) {
+        setAllActivities(activitiesRes.data as { created_at: string; points: number }[]);
+      }
+    };
 
-        if (!stats && session) {
-            updatePerson();
-        }
+    void load();
 
-        return () => subscription.unsubscribe();
-    }, [stats]);
+    // Realtime
+    const channel = supabase
+      .channel("dashboard")
+      .on("postgres_changes", { event: "*", schema: "public", table: "activities" }, () => void load())
+      .subscribe();
 
-    return (
-        <main className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4">
-            <div className="w-full max-w-4xl">
-                <Card>
-                    <CardHeader>
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                            <div className="mb-4 sm:mb-0">
-                                <CardTitle>Activity Contest</CardTitle>
-                                <CardDescription>
-                                    Live results of the team activity contest.
-                                </CardDescription>
-                            </div>
-                            <div className="flex gap-2">
-                                {stats ?
-                                    (<Button className="w-fit border hover:bg-gray-700" onClick={() => setStats(false)}>
-                                        {!session? ("Sign up / Log in") : ("Profile")}
-                                    </Button>)
-                                    :
-                                    (<Button className="w-fit border hover:bg-gray-700" onClick={() => window.location.reload()}>Team activity</Button>)
-                                }
-                            </div>
-                        </div>
-                    </CardHeader>
-                    {!stats ? (<CardContent className="grid gap-6">
-                            {!session ? (
-                                <div className="grid md:grid-cols-2 gap-8">
-                                    <Card>
-                                        <CardHeader>
-                                            <CardTitle>Sign Up</CardTitle>
-                                            <CardDescription>Create a new account.</CardDescription>
-                                        </CardHeader>
-                                        <CardContent className="grid gap-4">
-                                            <div className="grid gap-2">
-                                                <label htmlFor="signup-username">Username</label>
-                                                <Input id="signup-username" type="text"
-                                                       value={usernameSignUp}
-                                                       onChange={(e) => setUsernameSignUp(e.target.value)}
-                                                       placeholder="Enter your username"
-                                                />
-                                            </div>
-                                            <div className="grid gap-2">
-                                                <label htmlFor="signup-password">Password</label>
-                                                <Input id="signup-password" type="password"
-                                                       value={passwordSignUp}
-                                                       onChange={(e) => setPasswordSignUp(e.target.value)}
-                                                       placeholder="Enter a password"
-                                                />
-                                            </div>
-                                        </CardContent>
-                                        <CardFooter>
-                                            <Button className="w-full" onClick={() => handleRegister(usernameSignUp, passwordSignUp)}>Sign up</Button>
-                                        </CardFooter>
-                                    </Card>
-                                    <Card>
-                                        <CardHeader>
-                                            <CardTitle>Log In</CardTitle>
-                                            <CardDescription>Access your account.</CardDescription>
-                                        </CardHeader>
-                                        <CardContent className="grid gap-4">
-                                            <div className="grid gap-2">
-                                                <label htmlFor="login-username">Username</label>
-                                                <Input id="login-username" type="text"
-                                                       value={usernameLogIn}
-                                                       onChange={(e) => setUsernameLogIn(e.target.value)}
-                                                       placeholder="Enter your username"
-                                                />
-                                            </div>
-                                            <div className="grid gap-2">
-                                                <label htmlFor="login-password">Password</label>
-                                                <Input id="login-password" type="password"
-                                                       value={passwordLogIn}
-                                                       onChange={(e) => setPasswordLogIn(e.target.value)}
-                                                       placeholder="Enter your password"
-                                                />
-                                            </div>
-                                        </CardContent>
-                                        <CardFooter>
-                                            <Button className="w-full border hover:bg-gray-700"
-                                                    onClick={() => handleLogin(usernameLogIn, passwordLogIn)}>Log in
-                                            </Button>
-                                        </CardFooter>
-                                    </Card>
-                                </div>
-                            ) : (
-                                <div className="grid gap-6">
-                                    {personResult.length > 0 ?
-                                        (personResult.map((row) => (
-                                                <div key={row.id} className="grid gap-6">
-                                                    <Card>
-                                                        <CardHeader>
-                                                            <CardTitle>Your Profile</CardTitle>
-                                                            <CardDescription>Manage your team and log your activities.</CardDescription>
-                                                        </CardHeader>
-                                                        <CardContent className="grid gap-4">
-                                                            <div className="flex items-center gap-4">
-                                                                <p className="text-sm text-muted-foreground">Select your team:</p>
-                                                                <select className="w-fit border bg-white p-2 rounded-md"
-                                                                        value={teamValue}
-                                                                        onChange={(e) => {setTeamValue(e.target.value)}}
-                                                                >
-                                                                    <option value="1">none</option>
-                                                                    <option value="2">blue team</option>
-                                                                    <option value="3">red team</option>
-                                                                </select>
-                                                                <Button className="border hover:bg-gray-700"
-                                                                        onClick={() => updateTeam(Number(teamValue))}>Set Team
-                                                                </Button>
-                                                            </div>
-                                                            <div className="flex items-center justify-center gap-2 pt-4 border-t">
-                                                                <span className="font-mono text-lg">Total: {row.distance.toFixed(2)} pts</span>
-                                                            </div>
-                                                            <div className="grid sm:grid-cols-2 gap-4">
-                                                                <div className="grid gap-2">
-                                                                    <label>Activity Type</label>
-                                                                    <select className="bg-white w-full border p-2 rounded-md"
-                                                                            value={multiplier}
-                                                                            onChange={(e) => {setMultiplier(Number(e.target.value))}}
-                                                                    >
-                                                                        <option value="2">Running (x2)</option>
-                                                                        <option value="1.6">Walking (x1.6)</option>
-                                                                        <option value="1.4">Inline Skating (x1.4)</option>
-                                                                        <option value="1.25">Cycling (x1.25)</option>
-                                                                        <option value="3">Swimming (x3)</option>
-                                                                    </select>
-                                                                </div>
-                                                                <div className="grid gap-2">
-                                                                    <label>Distance (km)</label>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <Input
-                                                                            type="number"
-                                                                            placeholder="e.g., 5.2"
-                                                                            min="0"
-                                                                            value={inputValues[Number(row.id)] || ""}
-                                                                            onChange={(e) => InputChange(Number(row.id), e.target.value)}
-                                                                            className="bg-white"
-                                                                        />
-                                                                        <Button
-                                                                            size="icon"
-                                                                            className="border hover:bg-gray-700"
-                                                                            onClick={() => SubtractDistance(parseFloat(inputValues[Number(row.id)] || "0"), multiplier)}
-                                                                        >
-                                                                            -
-                                                                        </Button>
-                                                                        <Button
-                                                                            size="icon"
-                                                                            className="border hover:bg-gray-700"
-                                                                            onClick={() => UpdateDistance(parseFloat(inputValues[Number(row.id)] || "0"), multiplier)}
-                                                                        >
-                                                                            +
-                                                                        </Button>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <input
-                                                                type="file"
-                                                                className="hidden"
-                                                                accept="image/*"
-                                                                ref={(el) => { fileInputRefs.current[Number(row.id)] = el; }}
-                                                                onChange={(e) => uploadDistanceProof(e)}
-                                                            />
-                                                            <Button
-                                                                variant="secondary"
-                                                                className="border hover:bg-gray-200"
-                                                                disabled={useUploading === row.id}
-                                                                onClick={() => fileInputRefs.current[Number(row.id)]?.click()}
-                                                            >
-                                                                <ImagePlusIcon className="mr-2 h-4 w-4"/>
-                                                                {useUploading === row.id ? "Uploading..." : "Upload Proof"}
-                                                            </Button>
-                                                        </CardContent>
-                                                    </Card>
+    return () => { void supabase.removeChannel(channel); };
+  }, [getConfigValue]);
 
-                                                    <Card>
-                                                        <CardHeader>
-                                                            <CardTitle>Proof Gallery</CardTitle>
-                                                            <CardDescription>Your uploaded activity proofs.</CardDescription>
-                                                        </CardHeader>
-                                                        <CardContent>
-                                                            {proof.length > 0 ? (
-                                                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                                                                    {proof.map((item, index) => (
-                                                                        <div key={index} className="group relative overflow-hidden rounded-lg border bg-white shadow-sm transition-all hover:shadow-md">
-                                                                            <a href={item.distance_proof} target="_blank" rel="noreferrer">
-                                                                                <img
-                                                                                    src={item.distance_proof}
-                                                                                    alt={`Date of the proof ${new Date(item.created_at).toLocaleDateString()}`}
-                                                                                    className="h-32 w-full object-cover transition-transform group-hover:scale-105"
-                                                                                />
-                                                                                <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-1 text-center text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
-                                                                                    {new Date(item.created_at).toLocaleDateString()}
-                                                                                </div>
-                                                                            </a>
-                                                                            <Button
-                                                                                size="icon"
-                                                                                variant="destructive"
-                                                                                className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                                disabled={useUploading !== undefined}
-                                                                                onClick={() => {
-                                                                                    if(confirm("Are you sure?")) {
-                                                                                        deleteProof(item.distance_proof, item.created_at);
-                                                                                    }
-                                                                                }}
-                                                                            >
-                                                                                <Trash2 className="h-4 w-4 text-white"/>
-                                                                            </Button>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            ) : (
-                                                                <div className="text-center p-8 border border-dashed rounded-lg text-muted-foreground">
-                                                                    You don&apos;t have any distance proof.
-                                                                </div>
-                                                            )}
-                                                        </CardContent>
-                                                    </Card>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <div className="text-center p-8 border border-dashed rounded-lg text-muted-foreground flex items-center justify-center">
-                                                <Spinner className="mr-2 h-4 w-4 animate-spin" />
-                                                <p>Loading your profile...</p>
-                                            </div>
-                                        )}
-                                    <div className="flex justify-between items-center">
-                                        <p className="text-sm text-muted-foreground">Logged in as <b>{session?.user.email?.split('@')[0]}</b></p>
-                                        <Button variant="destructive"
-                                                className="border hover:bg-red-500 text-white"
-                                                onClick={handleLogout}>Logout
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>) :
-                        (<div>
-                            <CardContent>
-                                <ChartPieSimple
-                                    team1percent={team1}
-                                    team2percent={team2}
-                                    team1value={team1val}
-                                    team2value={team2val}
-                                />
-                            </CardContent>
-                            <CardFooter className="flex-col gap-4">
-                                <p className="text-sm text-muted-foreground">
-                                    View team details:
-                                </p>
-                                <nav className="flex w-full justify-center gap-4">
-                                    <a href="/Team1">
-                                        <Button className="bg-blue-600 text-white hover:bg-blue-700">
-                                            Blue Team
-                                        </Button>
-                                    </a>
-                                    <a href="/Randomizer">
-                                        <Button variant="outline" className={"border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white"}>Randomizer</Button>
-                                    </a>
-                                    <a href="/Team2">
-                                        <Button className="bg-red-600 text-white hover:bg-red-700">
-                                            Red Team
-                                        </Button>
-                                    </a>
-                                </nav>
-                            </CardFooter>
-                        </div>)}
-                </Card>
+  // Filter activities by date range
+  const filteredActivities = dateRange.from && dateRange.to
+    ? allActivities.filter((a) => {
+        const d = new Date(a.created_at);
+        return d >= dateRange.from! && d <= dateRange.to!;
+      })
+    : allActivities;
+
+  // Daily progress data
+  const dailyMap = new Map<string, number>();
+  filteredActivities.forEach((a) => {
+    const date = new Date(a.created_at).toISOString().slice(0, 10);
+    dailyMap.set(date, (dailyMap.get(date) ?? 0) + a.points);
+  });
+  let cumulative = 0;
+  const dailyData = Array.from(dailyMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, points]) => {
+      cumulative += points;
+      return { date: date.slice(5), points: Number(cumulative.toFixed(1)) };
+    });
+
+  const totalPoints = teamStats.reduce((s, t) => s + t.total_points, 0);
+  const totalMembers = teamStats.reduce((s, t) => s + t.total_members, 0);
+
+  return (
+    <PageTransition>
+      <div className="grid gap-6">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-primary/10 p-2.5">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold font-mono">{totalPoints.toFixed(0)}</p>
+                  <p className="text-xs text-muted-foreground">Łączne punkty</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-blue-500/10 p-2.5">
+                  <Users className="h-5 w-5 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold font-mono">{totalMembers}</p>
+                  <p className="text-xs text-muted-foreground">Uczestników</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-emerald-500/10 p-2.5">
+                  <Trophy className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold font-mono">{teams.length}</p>
+                  <p className="text-xs text-muted-foreground">Zespołów</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-amber-500/10 p-2.5">
+                  <AlertTriangle className="h-5 w-5 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold font-mono">
+                    {leaderboard.filter((e) => e.is_inactive).length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Nieaktywnych</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <DateRangeFilter onChange={setDateRange} />
+
+        {/* Charts row 1 */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <TeamBarChart data={teamStats} />
+          <TeamPieChart data={teamStats} />
+        </div>
+
+        {/* Charts row 2 */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <ProgressLineChart data={dailyData} title="Łączny postęp" />
+          <WeeklyTrendChart activities={filteredActivities} />
+        </div>
+
+        {/* Leaderboard preview */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Trophy className="h-5 w-5 text-amber-500" />
+              Top gracze
+            </CardTitle>
+            <Link href="/leaderboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Zobacz pełny ranking &rarr;
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {leaderboard.slice(0, 5).map((entry, i) => {
+                const team = teams.find((t) => t.id === entry.team_id);
+                return (
+                  <div key={entry.person_id} className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg font-bold text-muted-foreground w-6 text-center">
+                        {i + 1}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{entry.name}</span>
+                        {entry.is_inactive && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                            nieaktywny
+                          </span>
+                        )}
+                      </div>
+                      {team && (
+                        <span
+                          className="inline-block h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: team.color }}
+                        />
+                      )}
+                    </div>
+                    <span className="font-mono font-medium">{entry.total_points.toFixed(1)} pkt</span>
+                  </div>
+                );
+              })}
             </div>
-        </main>
-    );
+          </CardContent>
+        </Card>
+      </div>
+    </PageTransition>
+  );
 }
